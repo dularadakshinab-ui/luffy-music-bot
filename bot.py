@@ -4,8 +4,8 @@ import os
 
 TOKEN = os.environ.get("TOKEN") 
 
-RADIO_URL = "https://stream.live.vc.bbcmedia.co.uk/bbc_radio_one"
-VOICE_CHANNEL_ID = 123456789012345678  # 👈 PUT YOUR CHANNEL ID
+RADIO_URL = "http://stream.zeno.fm/71ntub27u18uv"
+VOICE_CHANNEL_ID = 1483395624278954086  # 👈 PUT YOUR CHANNEL ID
 
 intents = discord.Intents.default()
 intents.message_content = True
