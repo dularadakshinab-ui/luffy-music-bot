@@ -4,7 +4,7 @@ import os
 
 TOKEN = os.environ.get("TOKEN")
 
-RADIO_URL = "https://open.spotify.com/playlist/2QWjR53UPARsEJb3gJUIKV?si=ce55f19c0d6541b7"
+RADIO_URL = "https://stream.zeno.fm/71ntub27u18uv"
 VOICE_CHANNEL_ID = 1483417064650702942
 
 intents = discord.Intents.default()
