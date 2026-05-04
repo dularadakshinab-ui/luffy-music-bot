@@ -5,7 +5,7 @@ import os
 TOKEN = os.environ.get("TOKEN")
 
 RADIO_URL = "http://stream.zeno.fm/71ntub27u18uv"
-VOICE_CHANNEL_ID = 1483417064650702942
+VOICE_CHANNEL_ID = 1483417064650702942  # ✅ your correct channel ID
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -17,50 +17,56 @@ voice_client = None
 
 
 # ---------------- CONNECT ----------------
-async def connect(ctx=None):
+async def connect(ctx):
     global voice_client
 
-    channel = bot.get_channel(VOICE_CHANNEL_ID)
+    try:
+        channel = ctx.guild.get_channel(VOICE_CHANNEL_ID)
 
-    if channel is None:
-        if ctx:
-            await ctx.send("❌ Voice channel not found!")
-        return
+        if channel is None:
+            await ctx.send("❌ Voice channel not found (check ID)")
+            return
 
-    # disconnect old connection if exists
-    if voice_client and voice_client.is_connected():
-        await voice_client.disconnect()
+        # disconnect old connection if exists
+        if voice_client and voice_client.is_connected():
+            await voice_client.disconnect()
 
-    voice_client = await channel.connect()
+        voice_client = await channel.connect()
 
-    if ctx:
         await ctx.send("✅ Joined voice channel!")
+
+    except Exception as e:
+        print("VOICE ERROR:", e)
+        await ctx.send(f"❌ Failed to join voice: {e}")
 
 
 # ---------------- PLAY RADIO ----------------
-async def play_radio(ctx=None):
+async def play_radio(ctx):
     global voice_client
 
-    if not voice_client:
-        await connect(ctx)
+    try:
+        if not voice_client:
+            await connect(ctx)
 
-    if not voice_client:
-        return
+        if not voice_client:
+            return
 
-    # always reset audio to avoid stuck state
-    if voice_client.is_playing():
-        voice_client.stop()
+        if voice_client.is_playing():
+            voice_client.stop()
 
-    source = discord.FFmpegPCMAudio(
-        RADIO_URL,
-        before_options="-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5",
-        options="-vn"
-    )
+        source = discord.FFmpegPCMAudio(
+            RADIO_URL,
+            before_options="-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5",
+            options="-vn"
+        )
 
-    voice_client.play(source)
+        voice_client.play(source)
 
-    if ctx:
         await ctx.send("🎵 Radio started!")
+
+    except Exception as e:
+        print("PLAY ERROR:", e)
+        await ctx.send(f"❌ Play failed: {e}")
 
 
 # ---------------- COMMANDS ----------------
@@ -112,11 +118,15 @@ async def status(ctx):
 async def fix(ctx):
     global voice_client
 
-    if voice_client and voice_client.is_connected():
-        await voice_client.disconnect()
-        voice_client = None
+    try:
+        if voice_client and voice_client.is_connected():
+            await voice_client.disconnect()
 
-    await ctx.send("🔧 Reset done. Now use !play")
+        voice_client = None
+        await ctx.send("🔧 Reset done. Now use !join and !play")
+
+    except Exception as e:
+        await ctx.send(f"❌ Fix error: {e}")
 
 
 # ---------------- READY EVENT ----------------
