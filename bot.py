@@ -5,7 +5,7 @@ import os
 TOKEN = os.environ.get("TOKEN")
 
 RADIO_URL = "http://stream.zeno.fm/71ntub27u18uv"
-VOICE_CHANNEL_ID = 1483395624278954086
+VOICE_CHANNEL_ID = 1483417064650702942
 
 intents = discord.Intents.default()
 intents.message_content = True
