@@ -27,30 +27,40 @@ async def connect(ctx=None):
             await ctx.send("❌ Voice channel not found!")
         return
 
+    # disconnect old connection if exists
     if voice_client and voice_client.is_connected():
-        return
+        await voice_client.disconnect()
 
     voice_client = await channel.connect()
+
     if ctx:
         await ctx.send("✅ Joined voice channel!")
 
 
-# ---------------- PLAY ----------------
+# ---------------- PLAY RADIO ----------------
 async def play_radio(ctx=None):
     global voice_client
 
     if not voice_client:
         await connect(ctx)
 
-    if voice_client and not voice_client.is_playing():
-        source = discord.FFmpegPCMAudio(
-            RADIO_URL,
-            before_options="-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5",
-            options="-vn"
-        )
-        voice_client.play(source)
-        if ctx:
-            await ctx.send("🎵 Radio started!")
+    if not voice_client:
+        return
+
+    # always reset audio to avoid stuck state
+    if voice_client.is_playing():
+        voice_client.stop()
+
+    source = discord.FFmpegPCMAudio(
+        RADIO_URL,
+        before_options="-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5",
+        options="-vn"
+    )
+
+    voice_client.play(source)
+
+    if ctx:
+        await ctx.send("🎵 Radio started!")
 
 
 # ---------------- COMMANDS ----------------
@@ -71,7 +81,7 @@ async def stop(ctx):
 
     if voice_client and voice_client.is_playing():
         voice_client.stop()
-        await ctx.send("⏹ Music stopped")
+        await ctx.send("⏹ Stopped radio")
     else:
         await ctx.send("⚠ Nothing is playing")
 
@@ -85,7 +95,7 @@ async def leave(ctx):
         voice_client = None
         await ctx.send("👋 Left voice channel")
     else:
-        await ctx.send("⚠ I'm not in a voice channel")
+        await ctx.send("⚠ Not in voice channel")
 
 
 @bot.command()
@@ -93,12 +103,24 @@ async def status(ctx):
     global voice_client
 
     if voice_client and voice_client.is_playing():
-        await ctx.send("📻 Currently playing radio 🎵")
+        await ctx.send("📻 Radio is playing 🎵")
     else:
         await ctx.send("⛔ Not playing anything")
 
 
-# ---------------- AUTO START ----------------
+@bot.command()
+async def fix(ctx):
+    global voice_client
+
+    if voice_client and voice_client.is_connected():
+        await voice_client.disconnect()
+        voice_client = None
+
+    await ctx.send("🔧 Reset done. Now use !play")
+
+
+# ---------------- READY EVENT ----------------
+
 @bot.event
 async def on_ready():
     print(f"Logged in as {bot.user}")
