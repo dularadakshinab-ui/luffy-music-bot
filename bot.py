@@ -4,8 +4,9 @@ import os
 
 TOKEN = os.environ.get("TOKEN")
 
-RADIO_URL = "http://stream.zeno.fm/71ntub27u18uv"
-VOICE_CHANNEL_ID = 1483417064650702942  # ✅ your correct channel ID
+# Use HTTPS for better stability in Railway
+RADIO_URL = "https://stream.zeno.fm/71ntub27u18uv"
+VOICE_CHANNEL_ID = 1483417064650702942
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -23,11 +24,10 @@ async def connect(ctx):
     try:
         channel = ctx.guild.get_channel(VOICE_CHANNEL_ID)
 
-        if channel is None:
-            await ctx.send("❌ Voice channel not found (check ID)")
+        if not channel:
+            await ctx.send("❌ Voice channel not found")
             return
 
-        # disconnect old connection if exists
         if voice_client and voice_client.is_connected():
             await voice_client.disconnect()
 
@@ -37,7 +37,7 @@ async def connect(ctx):
 
     except Exception as e:
         print("VOICE ERROR:", e)
-        await ctx.send(f"❌ Failed to join voice: {e}")
+        await ctx.send(f"❌ Join failed: {e}")
 
 
 # ---------------- PLAY RADIO ----------------
@@ -56,8 +56,9 @@ async def play_radio(ctx):
 
         source = discord.FFmpegPCMAudio(
             RADIO_URL,
+            executable="ffmpeg",
             before_options="-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5",
-            options="-vn"
+            options="-vn -loglevel quiet"
         )
 
         voice_client.play(source)
@@ -65,7 +66,7 @@ async def play_radio(ctx):
         await ctx.send("🎵 Radio started!")
 
     except Exception as e:
-        print("PLAY ERROR:", e)
+        print("AUDIO ERROR:", e)
         await ctx.send(f"❌ Play failed: {e}")
 
 
@@ -87,9 +88,9 @@ async def stop(ctx):
 
     if voice_client and voice_client.is_playing():
         voice_client.stop()
-        await ctx.send("⏹ Stopped radio")
+        await ctx.send("⏹ Stopped")
     else:
-        await ctx.send("⚠ Nothing is playing")
+        await ctx.send("⚠ Nothing playing")
 
 
 @bot.command()
@@ -99,9 +100,9 @@ async def leave(ctx):
     if voice_client:
         await voice_client.disconnect()
         voice_client = None
-        await ctx.send("👋 Left voice channel")
+        await ctx.send("👋 Left voice")
     else:
-        await ctx.send("⚠ Not in voice channel")
+        await ctx.send("⚠ Not in voice")
 
 
 @bot.command()
@@ -109,27 +110,23 @@ async def status(ctx):
     global voice_client
 
     if voice_client and voice_client.is_playing():
-        await ctx.send("📻 Radio is playing 🎵")
+        await ctx.send("📻 Playing 🎵")
     else:
-        await ctx.send("⛔ Not playing anything")
+        await ctx.send("⛔ Not playing")
 
 
 @bot.command()
 async def fix(ctx):
     global voice_client
 
-    try:
-        if voice_client and voice_client.is_connected():
-            await voice_client.disconnect()
+    if voice_client and voice_client.is_connected():
+        await voice_client.disconnect()
 
-        voice_client = None
-        await ctx.send("🔧 Reset done. Now use !join and !play")
-
-    except Exception as e:
-        await ctx.send(f"❌ Fix error: {e}")
+    voice_client = None
+    await ctx.send("🔧 Reset done")
 
 
-# ---------------- READY EVENT ----------------
+# ---------------- READY ----------------
 
 @bot.event
 async def on_ready():
