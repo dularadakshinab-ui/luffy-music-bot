@@ -7,12 +7,12 @@ from spotipy.oauth2 import SpotifyClientCredentials
 import os
 import asyncio
 
-TOKEN = os.getenv("TOKEN")
+TOKEN = os.environ.get("TOKEN")
 
-SPOTIPY_CLIENT_ID = os.getenv("SPOTIPY_CLIENT_ID")
-SPOTIPY_CLIENT_SECRET = os.getenv("SPOTIPY_CLIENT_SECRET")
+SPOTIPY_CLIENT_ID = os.environ.get("SPOTIPY_CLIENT_ID")
+SPOTIPY_CLIENT_SECRET = os.environ.get("SPOTIPY_CLIENT_SECRET")
 
-VOICE_CHANNEL_ID = 1483417064650702942  # your voice channel ID
+VOICE_CHANNEL_ID = 1483417064650702942  # your VC ID
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -33,43 +33,45 @@ ytdl = yt_dlp.YoutubeDL({
 })
 
 queue = []
-last_song = None
+LAST_SONG = None
 voice_client = None
 
 
-# ---------------- VOICE CONNECT ----------------
-async def join_voice():
+# ---------------- JOIN ----------------
+async def join_voice(interaction=None):
     global voice_client
 
-    channel = bot.get_channel(VOICE_CHANNEL_ID)
-    if not channel:
-        return False
+    if interaction:
+        if not interaction.user.voice:
+            await interaction.response.send_message("❌ Join voice channel first", ephemeral=True)
+            return False
+        channel = interaction.user.voice.channel
+    else:
+        channel = bot.get_channel(VOICE_CHANNEL_ID)
 
-    if voice_client and voice_client.is_connected():
+    if voice_client:
         await voice_client.disconnect()
 
     voice_client = await channel.connect()
     return True
 
 
-# ---------------- SPOTIFY FIXED ----------------
+# ---------------- SPOTIFY ----------------
 def get_spotify_tracks(url):
     tracks = []
-
-    playlist = sp.playlist(url)
-    results = sp.playlist_items(playlist["id"])
+    results = sp.playlist_items(url)
 
     while results:
-        for item in results["items"]:
-            track = item.get("track")
+        for item in results['items']:
+            track = item.get('track')
             if not track:
                 continue
 
-            name = track["name"]
-            artist = track["artists"][0]["name"]
+            name = track['name']
+            artist = track['artists'][0]['name']
             tracks.append(f"{name} {artist}")
 
-        if results["next"]:
+        if results['next']:
             results = sp.next(results)
         else:
             break
@@ -79,26 +81,20 @@ def get_spotify_tracks(url):
 
 # ---------------- PLAY NEXT ----------------
 async def play_next(channel):
-    global queue, last_song, voice_client
+    global queue, LAST_SONG
 
     if queue:
         song = queue.pop(0)
-        last_song = song
-    elif last_song:
-        song = last_song
+        LAST_SONG = song
+    elif LAST_SONG:
+        song = LAST_SONG  # loop last song
     else:
-        await channel.send("📭 Queue finished")
+        await channel.send("📭 Queue ended")
         return
 
     try:
         info = ytdl.extract_info(f"ytsearch1:{song}", download=False)
-
-        if not info["entries"]:
-            await channel.send(f"❌ Not found: {song}")
-            await play_next(channel)
-            return
-
-        url = info["entries"][0]["url"]
+        url = info['entries'][0]['url']
 
         source = discord.FFmpegPCMAudio(
             url,
@@ -111,31 +107,30 @@ async def play_next(channel):
             after=lambda e: asyncio.run_coroutine_threadsafe(play_next(channel), bot.loop)
         )
 
-        await channel.send(f"🎶 Now playing: **{song}**")
+        await channel.send(f"🎶 Now playing: {song}")
 
     except Exception as e:
-        print("ERROR:", e)
+        print("PLAY ERROR:", e)
         await play_next(channel)
 
 
-# ---------------- /PLAY ----------------
+# ---------------- SLASH PLAY ----------------
 @bot.tree.command(name="play", description="Play song or Spotify playlist")
+@app_commands.describe(query="Song name or Spotify playlist link")
 async def play(interaction: discord.Interaction, query: str):
     global queue, voice_client
 
     await interaction.response.defer()
 
     if not voice_client:
-        ok = await join_voice()
+        ok = await join_voice(interaction)
         if not ok:
-            await interaction.followup.send("❌ Voice channel not found")
             return
 
     if "spotify.com/playlist" in query:
         tracks = get_spotify_tracks(query)
         queue.extend(tracks)
-        await interaction.followup.send(f"✅ Added {len(tracks)} songs from Spotify")
-
+        await interaction.followup.send(f"✅ Added {len(tracks)} songs")
     else:
         queue.append(query)
         await interaction.followup.send(f"🎵 Added: {query}")
@@ -144,8 +139,8 @@ async def play(interaction: discord.Interaction, query: str):
         await play_next(interaction.channel)
 
 
-# ---------------- /SKIP ----------------
-@bot.tree.command(name="skip", description="Skip song")
+# ---------------- SKIP ----------------
+@bot.tree.command(name="skip", description="Skip current song")
 async def skip(interaction: discord.Interaction):
     if voice_client and voice_client.is_playing():
         voice_client.stop()
@@ -154,8 +149,8 @@ async def skip(interaction: discord.Interaction):
         await interaction.response.send_message("⚠ Nothing playing")
 
 
-# ---------------- /STOP ----------------
-@bot.tree.command(name="stop", description="Stop music")
+# ---------------- STOP ----------------
+@bot.tree.command(name="stop", description="Stop and clear queue")
 async def stop(interaction: discord.Interaction):
     global queue
     queue.clear()
@@ -163,25 +158,21 @@ async def stop(interaction: discord.Interaction):
     if voice_client and voice_client.is_playing():
         voice_client.stop()
 
-    await interaction.response.send_message("⏹ Stopped")
+    await interaction.response.send_message("⏹ Stopped & cleared queue")
 
 
 # ---------------- READY ----------------
 @bot.event
 async def on_ready():
-    try:
-        synced = await bot.tree.sync()
-        print(f"✅ Synced {len(synced)} commands")
-    except Exception as e:
-        print("Sync error:", e)
-
+    await bot.tree.sync()
     print(f"Logged in as {bot.user}")
 
+    # auto join (24/7 style)
     try:
         await join_voice()
-        print("🎧 Auto joined voice channel")
-    except:
-        pass
+        print("✅ Auto joined voice channel")
+    except Exception as e:
+        print("Auto join failed:", e)
 
 
 bot.run(TOKEN)
